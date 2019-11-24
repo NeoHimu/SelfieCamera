@@ -70,7 +70,6 @@ import java.util.List;
 public class Camera2VideoImageActivity extends AppCompatActivity implements SensorEventListener {
 
     Confirmer confirmer=null;
-    private final int pBarMax = 1;
     private ProgressBar pBar;
     AlertDialog.Builder builder;
 
@@ -224,7 +223,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
 
         @Override
         protected Integer doInBackground(Void... voids) {
-            for (int i=0;i<confirmationTime;i++)
+            for (int i=0;i<=confirmationTime;i++)
             {
                 if(isCancelled())
                     break;
@@ -429,7 +428,6 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera2_video_image);
         pBar = (ProgressBar) findViewById(R.id.progressBar);
-        pBar.setMax(pBarMax);
         builder = new AlertDialog.Builder(this);
         isSelfieModeOn = findViewById(R.id.idSelfieModeSwitch);
         isSelfieModeOn.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
