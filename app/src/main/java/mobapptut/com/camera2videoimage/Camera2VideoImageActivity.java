@@ -195,7 +195,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         circularQueue.enqueue(angleNow);
 
         // if user is trying to tilt the phone cancel the shot
-        if(confirmer!=null && Math.abs(angleNow-anglePrev)>=5)
+        if(confirmer!=null && Math.abs(angleNow-anglePrev)>=3)
             confirmer.cancel(true);
 
         if((sumAll()/circularQueue.size()==angleNow) && isSafeToCapture==true)
