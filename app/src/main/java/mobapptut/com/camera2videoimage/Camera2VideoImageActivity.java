@@ -81,8 +81,10 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
 
     private float anglePrev=-1;
     private float angleNow=-1;
-    int queueSize=50;
+    int queueSize=40;
     int confirmationTime=15; // 15*100 ms = 1.5 seconds
+    float accel_threshold = 18.0f;
+    float cancel_threshold = 3.0f;
     private CircularQueue<Float> circularQueue = new CircularQueue(queueSize);
     boolean isSafeToCapture = true;
 
@@ -95,7 +97,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
     // device sensor manager
     private SensorManager mSensorManager;
 
-    TextView tvHeading, tvCount;
+    TextView tvHeading, tvCount, tvAccel;
 
     private static final int REQUEST_CAMERA_PERMISSION_RESULT = 0;
     private static final int REQUEST_WRITE_EXTERNAL_STORAGE_PERMISSION_RESULT = 1;
@@ -184,29 +186,50 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
-        // get the angle around the z-axis rotated
-        float degree = Math.round(sensorEvent.values[0]);
 
-        tvHeading.setText("Now: " + Float.toString(degree) + " degrees");
+        if (sensorEvent.sensor.getType()==Sensor.TYPE_ACCELEROMETER){
+            double ax=sensorEvent.values[0];
+            double ay=sensorEvent.values[1];
+            double az=sensorEvent.values[2];
 
-        anglePrev = angleNow;
-        angleNow = degree;
+            double temp = Math.sqrt(ax*ax + ay*ay + az*az);
+            tvAccel.setText(temp+"");
 
-        circularQueue.enqueue(angleNow);
 
-        // if user is trying to tilt the phone cancel the shot
-        if(confirmer!=null && Math.abs(angleNow-anglePrev)>=3)
-            confirmer.cancel(true);
-
-        if((sumAll()/circularQueue.size()==angleNow) && isSafeToCapture==true)
-        {
-            //start a AsyncTask here
-            //onPostExecute, click the photo
-            confirmer = new Confirmer();
-            isSafeToCapture = false; //make it true when image is saved on the disk
-            confirmer.execute();
+            if(temp>=accel_threshold)
+            {
+//                Toast.makeText(this, "Toasted!! "+count, Toast.LENGTH_SHORT).show();
+                //count++;
+                isSelfieModeOn.setChecked(false);
+            }
         }
-        currentDegree = -degree;
+
+        if(sensorEvent.sensor.getType()==Sensor.TYPE_ORIENTATION)
+        {
+            // get the angle around the z-axis rotated
+            float degree = Math.round(sensorEvent.values[0]);
+
+            tvHeading.setText("Now: " + Float.toString(degree) + " degrees");
+
+            anglePrev = angleNow;
+            angleNow = degree;
+
+            circularQueue.enqueue(angleNow);
+
+            // if user is trying to tilt the phone cancel the shot
+            if(confirmer!=null && Math.abs(angleNow-anglePrev)>=cancel_threshold)
+                confirmer.cancel(true);
+
+            if((sumAll()/circularQueue.size()==angleNow) && isSafeToCapture && isSelfieModeOn.isChecked())
+            {
+                //start a AsyncTask here
+                //onPostExecute, click the photo
+                confirmer = new Confirmer();
+                isSafeToCapture = false; //make it true when image is saved on the disk
+                confirmer.execute();
+            }
+            currentDegree = -degree;
+        }
     }
 
     @Override
@@ -225,7 +248,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         protected Integer doInBackground(Void... voids) {
             for (int i=0;i<=confirmationTime;i++)
             {
-                if(isCancelled())
+                if(isCancelled() || isSelfieModeOn.isChecked()==false)
                     break;
 
                 publishProgress(i);
@@ -287,36 +310,30 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
                 mImage.close();
 
                 Intent mediaStoreUpdateIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                if(mediaStoreUpdateIntent==null)
-                {
-                    Toast.makeText(Camera2VideoImageActivity.this, "Null value!", Toast.LENGTH_SHORT).show();
-                }
-                else
-                {
-                    mediaStoreUpdateIntent.setData(Uri.fromFile(new File(mImageFileName)));
-                    Log.d("log.d", "Image is saved!!");
-                    sendBroadcast(mediaStoreUpdateIntent);
+                mediaStoreUpdateIntent.setData(Uri.fromFile(new File(mImageFileName)));
+                Log.d("log.d", "Image is saved!!");
+                sendBroadcast(mediaStoreUpdateIntent);
+                isSafeToCapture = true; //make it true when image is saved on the disk
 
-                    //Setting message manually and performing action on button click
-                    builder.setMessage("Do you want to click more photos?")
-                            .setCancelable(false)
-                            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int id) {
-                                    isSafeToCapture = true; //make it true when image is saved on the disk
-                                }
-                            })
-                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
-                                public void onClick(DialogInterface dialog, int id) {
-                                    isSelfieModeOn.setChecked(false);
-                                    isSafeToCapture = false; //make it true when image is saved on the disk
-                                }
-                            });
-                    //Creating dialog box
-                    AlertDialog alert = builder.create();
-                    //Setting the title manually
-                    alert.setTitle("AlertDialogExample");
-                    alert.show();
-                }
+                //Setting message manually and performing action on button click
+//                    builder.setMessage("Do you want to click more photos?")
+//                            .setCancelable(false)
+//                            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+//                                public void onClick(DialogInterface dialog, int id) {
+//                                    isSafeToCapture = true; //make it true when image is saved on the disk
+//                                }
+//                            })
+//                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
+//                                public void onClick(DialogInterface dialog, int id) {
+//                                    isSelfieModeOn.setChecked(false);
+//                                    isSafeToCapture = false; //make it true when image is saved on the disk
+//                                }
+//                            });
+//                    //Creating dialog box
+//                    AlertDialog alert = builder.create();
+//                    //Setting the title manually
+//                    alert.setTitle("AlertDialogExample");
+//                    alert.show();
 
                 if(fileOutputStream != null) {
                     try {
@@ -435,7 +452,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 //                Log.v("Switch State=", ""+isChecked);
-                isSafeToCapture = !isSafeToCapture;
+                    isSafeToCapture = isSelfieModeOn.isChecked();
             }
 
         });
@@ -444,6 +461,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         // TextView that will tell the user what degree is he heading
         tvHeading = (TextView) findViewById(R.id.tvHeading);
         tvCount = (TextView) findViewById(R.id.tvCount);
+        tvAccel = findViewById(R.id.tvAccel);
 
         // initialize your android device sensor capabilities
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -533,6 +551,8 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         // for the system's orientation sensor registered listeners
         mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),
                 SensorManager.SENSOR_DELAY_GAME);
+        // for accelerometer
+        mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
 
         if(mTextureView.isAvailable()) {
             setupCamera(mTextureView.getWidth(), mTextureView.getHeight());
