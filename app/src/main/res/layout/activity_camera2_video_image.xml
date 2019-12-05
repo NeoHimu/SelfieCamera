@@ -91,14 +91,14 @@
         <!--android:visibility="invisible" -->
         <!--android:layout_above="@+id/videoOnlineImageButton"-->
         <!--android:layout_alignStart="@+id/videoOnlineImageButton" />-->
-    <Switch
-        android:id="@+id/idSelfieModeSwitch"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="600dp"
-        android:layout_marginLeft="150dp"
-        android:checked="true"
-        android:textOn="On"
-        android:textOff="Off"
-        android:text="Selfie Mode" />
+<!--    <Switch-->
+<!--        android:id="@+id/idSelfieModeSwitch"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_marginTop="600dp"-->
+<!--        android:layout_marginLeft="150dp"-->
+<!--        android:checked="true"-->
+<!--        android:textOn="On"-->
+<!--        android:textOff="Off"-->
+<!--        android:text="Selfie Mode" />-->
 </RelativeLayout>

@@ -73,20 +73,21 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
     private ProgressBar pBar;
     AlertDialog.Builder builder;
 
-    Switch isSelfieModeOn;
+//    Switch isSelfieModeOn;
 
     private static final String TAG = "Camera2VideoImageActivi";
 
-    private int count = 0;
+    private boolean takeAnotherSelfie = false;
 
     private float anglePrev=-1;
     private float angleNow=-1;
-    int queueSize=40;
+    int queueSize=30;
     int confirmationTime=15; // 15*100 ms = 1.5 seconds
-    float accel_threshold = 18.0f;
+//    float accel_threshold = 18.0f;
     float cancel_threshold = 3.0f;
     private CircularQueue<Float> circularQueue = new CircularQueue(queueSize);
     boolean isSafeToCapture = true;
+    boolean isLeftSwiped = false;
 
     // define the display assembly compass picture
     private ImageView image;
@@ -97,7 +98,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
     // device sensor manager
     private SensorManager mSensorManager;
 
-    TextView tvHeading, tvCount, tvAccel;
+    TextView tvHeading, tvCount;//, tvAccel;
 
     private static final int REQUEST_CAMERA_PERMISSION_RESULT = 0;
     private static final int REQUEST_WRITE_EXTERNAL_STORAGE_PERMISSION_RESULT = 1;
@@ -144,9 +145,6 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-//                        mChronometer.setBase(SystemClock.elapsedRealtime());
-//                        mChronometer.setVisibility(View.VISIBLE);
-//                        mChronometer.start();
                     }
                 });
             } else {
@@ -186,26 +184,6 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
 
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
-
-        if (sensorEvent.sensor.getType()==Sensor.TYPE_ACCELEROMETER){
-            double ax=sensorEvent.values[0];
-            double ay=sensorEvent.values[1];
-            double az=sensorEvent.values[2];
-
-            double temp = Math.sqrt(ax*ax + ay*ay + az*az);
-            tvAccel.setText(temp+"");
-
-
-            if(temp>=accel_threshold)
-            {
-//                Toast.makeText(this, "Toasted!! "+count, Toast.LENGTH_SHORT).show();
-                //count++;
-                isSelfieModeOn.setChecked(false);
-            }
-        }
-
-        if(sensorEvent.sensor.getType()==Sensor.TYPE_ORIENTATION)
-        {
             // get the angle around the z-axis rotated
             float degree = Math.round(sensorEvent.values[0]);
 
@@ -216,20 +194,22 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
 
             circularQueue.enqueue(angleNow);
 
+            if(confirmer!=null && isLeftSwiped)
+                confirmer.cancel(true);
+
             // if user is trying to tilt the phone cancel the shot
             if(confirmer!=null && Math.abs(angleNow-anglePrev)>=cancel_threshold)
                 confirmer.cancel(true);
 
-            if((sumAll()/circularQueue.size()==angleNow) && isSafeToCapture && isSelfieModeOn.isChecked())
+            if((sumAll()/circularQueue.size()==angleNow) && isSafeToCapture && takeAnotherSelfie==true)// && isSelfieModeOn.isChecked())
             {
                 //start a AsyncTask here
                 //onPostExecute, click the photo
                 confirmer = new Confirmer();
-                isSafeToCapture = false; //make it true when image is saved on the disk
+                isSafeToCapture = false; //make it true when image is saved on the disk and if shot is cancelled
                 confirmer.execute();
             }
             currentDegree = -degree;
-        }
     }
 
     @Override
@@ -248,7 +228,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         protected Integer doInBackground(Void... voids) {
             for (int i=0;i<=confirmationTime;i++)
             {
-                if(isCancelled() || isSelfieModeOn.isChecked()==false)
+                if(isCancelled())// || isSelfieModeOn.isChecked()==false)
                     break;
 
                 publishProgress(i);
@@ -266,6 +246,10 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         protected void onCancelled() {
             super.onCancelled();
             isSafeToCapture = true;
+            if(isLeftSwiped)
+                takeAnotherSelfie = false;
+            else
+                takeAnotherSelfie = true;
             pBar.setProgress(0);
         }
 
@@ -314,26 +298,6 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
                 Log.d("log.d", "Image is saved!!");
                 sendBroadcast(mediaStoreUpdateIntent);
                 isSafeToCapture = true; //make it true when image is saved on the disk
-
-                //Setting message manually and performing action on button click
-//                    builder.setMessage("Do you want to click more photos?")
-//                            .setCancelable(false)
-//                            .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-//                                public void onClick(DialogInterface dialog, int id) {
-//                                    isSafeToCapture = true; //make it true when image is saved on the disk
-//                                }
-//                            })
-//                            .setNegativeButton("No", new DialogInterface.OnClickListener() {
-//                                public void onClick(DialogInterface dialog, int id) {
-//                                    isSelfieModeOn.setChecked(false);
-//                                    isSafeToCapture = false; //make it true when image is saved on the disk
-//                                }
-//                            });
-//                    //Creating dialog box
-//                    AlertDialog alert = builder.create();
-//                    //Setting the title manually
-//                    alert.setTitle("AlertDialogExample");
-//                    alert.show();
 
                 if(fileOutputStream != null) {
                     try {
@@ -422,6 +386,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
     private String mVideoFileName;
     private File mImageFolder;
     private String mImageFileName;
+    public View v;
 
     private static SparseIntArray ORIENTATIONS = new SparseIntArray();
     static {
@@ -444,24 +409,34 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera2_video_image);
+        v = getWindow().getDecorView().findViewById(android.R.id.content);
         pBar = (ProgressBar) findViewById(R.id.progressBar);
         builder = new AlertDialog.Builder(this);
-        isSelfieModeOn = findViewById(R.id.idSelfieModeSwitch);
-        isSelfieModeOn.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
 
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-//                Log.v("Switch State=", ""+isChecked);
-                    isSafeToCapture = isSelfieModeOn.isChecked();
+        v.setOnTouchListener(new OnSwipeTouchListener(Camera2VideoImageActivity.this) {
+            public void onSwipeTop() {
+//                Toast.makeText(Camera2VideoImageActivity.this, "top", Toast.LENGTH_SHORT).show();
+            }
+            public void onSwipeRight() {
+                takeAnotherSelfie = true;
+                isLeftSwiped = false;
+                Toast.makeText(Camera2VideoImageActivity.this, "Take another selfie!", Toast.LENGTH_SHORT).show();
+            }
+            public void onSwipeLeft() {
+                takeAnotherSelfie = false;
+                isLeftSwiped = true;
+                Toast.makeText(Camera2VideoImageActivity.this, "Swipe right to take auto selfie!", Toast.LENGTH_SHORT).show();
+            }
+            public void onSwipeBottom() {
+//                Toast.makeText(Camera2VideoImageActivity.this, "bottom", Toast.LENGTH_SHORT).show();
             }
 
         });
-//        image = (ImageView) findViewById(R.id.imageViewCompass);
+
 
         // TextView that will tell the user what degree is he heading
         tvHeading = (TextView) findViewById(R.id.tvHeading);
         tvCount = (TextView) findViewById(R.id.tvCount);
-        tvAccel = findViewById(R.id.tvAccel);
 
         // initialize your android device sensor capabilities
         mSensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -473,63 +448,9 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         }
         circularQueue.enqueue(10.0f);
 
-
-
         createVideoFolder();
         createImageFolder();
-
-//        mChronometer = (Chronometer) findViewById(R.id.chronometer);
         mTextureView = (TextureView) findViewById(R.id.textureView);
-//        mStillImageButton = (ImageButton) findViewById(R.id.cameraImageButton2);
-//        mStillImageButton.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                if(!(mIsTimelapse || mIsRecording)) {
-//                    checkWriteStoragePermission();
-//                }
-//                Toast.makeText(Camera2VideoImageActivity.this, "Before lockFocus()!!", Toast.LENGTH_SHORT).show();
-//                Log.d("log.d", "Before lockfocus()");
-//                lockFocus();
-//                Log.d("log.d", "After lockfocus()");
-//            }
-//        });
-//        mRecordImageButton = (ImageButton) findViewById(R.id.videoOnlineImageButton);
-//        mRecordImageButton.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                if (mIsRecording || mIsTimelapse) {
-//                    mChronometer.stop();
-//                    mChronometer.setVisibility(View.INVISIBLE);
-//                    mIsRecording = false;
-//                    mIsTimelapse = false;
-//                    mRecordImageButton.setImageResource(R.mipmap.btn_video_online);
-//
-//                    // Starting the preview prior to stopping recording which should hopefully
-//                    // resolve issues being seen in Samsung devices.
-//                    startPreview();
-//                    mMediaRecorder.stop();
-//                    mMediaRecorder.reset();
-//
-//                    Intent mediaStoreUpdateIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-//                    mediaStoreUpdateIntent.setData(Uri.fromFile(new File(mVideoFileName)));
-//                    sendBroadcast(mediaStoreUpdateIntent);
-//
-//                } else {
-//                    mIsRecording = true;
-//                    mRecordImageButton.setImageResource(R.mipmap.btn_video_busy);
-//                    checkWriteStoragePermission();
-//                }
-//            }
-//        });
-//        mRecordImageButton.setOnLongClickListener(new View.OnLongClickListener() {
-//            @Override
-//            public boolean onLongClick(View v) {
-//                mIsTimelapse =true;
-//                mRecordImageButton.setImageResource(R.mipmap.btn_timelapse);
-//                checkWriteStoragePermission();
-//                return true;
-//            }
-//        });
     }
 
     float sumAll()
@@ -552,7 +473,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION),
                 SensorManager.SENSOR_DELAY_GAME);
         // for accelerometer
-        mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
+//        mSensorManager.registerListener(this, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
 
         if(mTextureView.isAvailable()) {
             setupCamera(mTextureView.getWidth(), mTextureView.getHeight());
@@ -904,9 +825,6 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
             if(mIsRecording || mIsTimelapse) {
                 startRecord();
                 mMediaRecorder.start();
-//                mChronometer.setBase(SystemClock.elapsedRealtime());
-//                mChronometer.setVisibility(View.VISIBLE);
-//                mChronometer.start();
             }
         }
     }
