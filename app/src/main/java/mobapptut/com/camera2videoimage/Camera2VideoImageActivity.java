@@ -246,10 +246,11 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
         protected void onCancelled() {
             super.onCancelled();
             isSafeToCapture = true;
-            if(isLeftSwiped)
-                takeAnotherSelfie = false;
-            else
-                takeAnotherSelfie = true;
+//            if(isLeftSwiped)
+//                takeAnotherSelfie = false;
+//            else
+//                takeAnotherSelfie = true;
+            takeAnotherSelfie = false;
             pBar.setProgress(0);
         }
 
@@ -265,6 +266,7 @@ public class Camera2VideoImageActivity extends AppCompatActivity implements Sens
                 pBar.setProgress(0);
                 tvCount.setText("Shot at: "+angleNow+" degrees");
                 lockFocus();
+            takeAnotherSelfie = false;
         }
     }
 
